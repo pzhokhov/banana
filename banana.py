@@ -155,7 +155,7 @@ class CrosswordTreeNode():
         if self.children is not None:
             return
         possible_next_words = self.crossword.get_all_next_words(self.all_words, self.remaining_letters)
-        self.children = {}
+        self.children = []
         for word in possible_next_words:
             new_crossword = self.crossword.copy()
             new_remaining_letters = self.remaining_letters.copy()
@@ -163,17 +163,22 @@ class CrosswordTreeNode():
             for letter in letters_used:
                 new_remaining_letters[letter] -= 1
             
-            self.children[word] = CrosswordTreeNode(self.all_words, new_crossword, new_remaining_letters)
+            self.children.append(CrosswordTreeNode(self.all_words, new_crossword, new_remaining_letters))
+            random.shuffle(self.children)
 
-    def search_leaves(self):
+    def search_leaves(self, time_to_stop=None):
+        import time
         if self.is_leaf():
             self.remaining_letters = {l : c for l,c in self.remaining_letters.items() if c > 0}
             return [(self.crossword, self.remaining_letters)] 
         
         retval = []
-        for child_cw in self.children.values():
-            leaves = child_cw.search_leaves()
-            if not any(leaves[0][1]):
+        for child_cw in self.children:
+            if time_to_stop is not None and time.time() > time_to_stop:
+                break
+
+            leaves = child_cw.search_leaves(time_to_stop)
+            if any(leaves) and not any(leaves[0][1]):
                 return leaves
             retval += leaves
 
@@ -465,21 +470,22 @@ def sample_banana_letters(N):
     return all_letter_list[:N]
 
 
-def search_crosswords(letters):
+def search_crosswords(letters, timeout=10):
+    import time
     letter_count = count_letters(letters)
     all_words = load_dictionary()
     all_words = get_possible_words(all_words, letter_count)
     tree_root = CrosswordTreeNode(all_words, Crossword(), letter_count)
-    leaves = tree_root.search_leaves()
+    leaves = tree_root.search_leaves(time.time() + timeout)
     return leaves
     
 
 if __name__ == '__main__':
-    N = 10
+    N = 20
     letters = sample_banana_letters(N)
     print(letters)
     leaf_cws = search_crosswords(letters)
-    for cw,letters in leaf_cws:
+    for cw,letters in leaf_cws[:5]:
         print(letters)
         cw.write()
 
